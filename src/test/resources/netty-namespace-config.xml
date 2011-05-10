@@ -2,9 +2,17 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xmlns:netty="http://www.mulesoft.org/schema/mule/netty"
+      xmlns:tcp="http://www.mulesoft.org/schema/mule/tcp"
       xsi:schemaLocation="
        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd
-       http://www.mulesoft.org/schema/mule/netty http://www.mulesoft.org/schema/mule/netty/3.2/mule-netty.xsd">
+       http://www.mulesoft.org/schema/mule/netty http://www.mulesoft.org/schema/mule/netty/3.2/mule-netty.xsd
+       http://www.mulesoft.org/schema/mule/tcp http://www.mulesoft.org/schema/mule/tcp/3.2/mule-tcp.xsd">
+
+    <tcp:connector name="testClientConnector">
+        <tcp:direct-protocol payloadOnly="true"/>
+    </tcp:connector>
+
+    <custom-transformer name="bufferToString" class="org.mule.transport.netty.ChannelBufferToStringTransformer"/>
 
     <netty:connector name="nettyConnector">
         <!-- TODO Add connector specific properties here and then assert that 
@@ -12,8 +20,18 @@
     </netty:connector>
 
     <flow name="netty">
-        <netty:inbound-endpoint address="netty://localhost:5000"/>
+        <netty:inbound-endpoint address="netty://localhost:5000" exchange-pattern="request-response"/>
         <echo-component/>
+        <netty:outbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response">
+            <response>
+                <transformer ref="bufferToString"/>
+            </response>
+        </netty:outbound-endpoint>
+    </flow>
+
+    <flow name="netty2">
+        <netty:inbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response"/>
+        <append-string-transformer message=" Received"/>
     </flow>
 
 </mule>

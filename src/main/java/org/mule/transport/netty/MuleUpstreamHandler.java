@@ -16,6 +16,7 @@ import org.mule.api.MuleMessage;
 import org.mule.api.MuleSession;
 import org.mule.api.transport.SessionHandler;
 import org.mule.session.LegacySessionHandler;
+import org.mule.util.ExceptionUtils;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -37,17 +38,17 @@ import org.jboss.netty.handler.stream.ChunkedStream;
 import org.jboss.netty.handler.stream.ChunkedWriteHandler;
 
 /**
- * TODO handler/mule receiver worker
+ * Server-side Mule-Netty integration point.
  */
-public class MuleServerUpstreamHandler extends SimpleChannelUpstreamHandler
+public class MuleUpstreamHandler extends SimpleChannelUpstreamHandler
 {
 
-    private static final Logger logger = Logger.getLogger(MuleServerUpstreamHandler.class.getName());
+    private static final Logger logger = Logger.getLogger(MuleUpstreamHandler.class.getName());
 
     private final AtomicLong transferredBytes = new AtomicLong();
     private NettyMessageReceiver receiver;
 
-    public MuleServerUpstreamHandler(NettyMessageReceiver receiver)
+    public MuleUpstreamHandler(NettyMessageReceiver receiver)
     {
         this.receiver = receiver;
     }
@@ -99,6 +100,7 @@ public class MuleServerUpstreamHandler extends SimpleChannelUpstreamHandler
                     }
                     else
                     {
+                        // TODO transport transformers
                         final ChannelBuffer out = ChannelBuffers.wrappedBuffer(message.getPayloadAsBytes());
                         channel.write(out).addListener(ChannelFutureListener.CLOSE);
                     }
@@ -107,7 +109,10 @@ public class MuleServerUpstreamHandler extends SimpleChannelUpstreamHandler
                 {
                     // send an error message from the root exception
                     channel.getPipeline().addLast("encoder", new StringEncoder(Charset.forName(receiver.getEndpoint().getEncoding())));
-                    channel.write(exceptionPayload.getRootException().getMessage()).addListener(ChannelFutureListener.CLOSE);
+                    final String rootCause = ExceptionUtils.getRootCauseMessage(exceptionPayload.getException());
+
+                    // TODO check bytes encoding
+                    channel.write(rootCause).addListener(ChannelFutureListener.CLOSE);
                 }
             }
             else

@@ -20,7 +20,6 @@ import org.mule.api.transport.Connector;
 import org.mule.config.i18n.CoreMessages;
 import org.mule.transport.AbstractMessageReceiver;
 import org.mule.transport.ConnectException;
-import org.mule.transport.netty.i18n.NettyMessages;
 import org.mule.util.ExceptionUtils;
 import org.mule.util.StringUtils;
 import org.mule.util.concurrent.NamedThreadFactory;
@@ -101,7 +100,7 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
                 //p.addLast("encoder-length", new LengthFieldPrepender(2));
                 //p.addLast("chunker", new FixedLengthFrameDecoder(16384));
                 //p.addLast("executor", new ExecutionHandler(new OrderedMemoryAwareThreadPoolExecutor(16, 1048576, 1048576)));
-                p.addLast("handler-mule", new MuleServerUpstreamHandler(NettyMessageReceiver.this));
+                p.addLast("handler-mule", new MuleUpstreamHandler(NettyMessageReceiver.this));
 
                 return p;
             }
@@ -127,8 +126,9 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
         catch (Exception e)
         {
             // TODO message
+            final Throwable rootCause = ExceptionUtils.getRootCause(e);
             throw new ConnectException(CoreMessages.createStaticMessage("Failed to bind to uri " + uri),
-                                       ExceptionUtils.getRootCause(e), this);
+                                       rootCause == null ? e : rootCause, this);
             //throw new ConnectException(NettyMessages.failedToBindToUri(uri), ExceptionUtils.getRootCause(e), this);
         }
     }
