@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xmlns:netty="http://www.mulesoft.org/schema/mule/netty"
-    xsi:schemaLocation="
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:netty="http://www.mulesoft.org/schema/mule/netty"
+      xsi:schemaLocation="
        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd
        http://www.mulesoft.org/schema/mule/netty http://www.mulesoft.org/schema/mule/netty/3.2/mule-netty.xsd">
 
@@ -10,4 +10,10 @@
         <!-- TODO Add connector specific properties here and then assert that 
              they have been set in org.mule.transport.netty.NettyNamespaceHandlerTestCase -->
     </netty:connector>
+
+    <flow name="netty">
+        <netty:inbound-endpoint address="netty://localhost:5000"/>
+        <echo-component/>
+    </flow>
+
 </mule>

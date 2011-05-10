@@ -66,13 +66,15 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
         allChannels = new DefaultChannelGroup(this.getReceiverKey() + ".all-channels");
         // Set up the pipeline factory.
         final MuleContext muleContext = connector.getMuleContext();
+
+        // TODO non-clashing receiver names, threading works differently for netty (back to Mule 1.x days!)
         final ExecutorService bossExecutor = Executors.newCachedThreadPool(new NamedThreadFactory(
-                ThreadNameHelper.receiver(muleContext, connector.getName()) + ".boss",
+                String.format("%s[%s].boss", ThreadNameHelper.receiver(muleContext, connector.getName()), getReceiverKey()),
                 muleContext.getExecutionClassLoader()
         ));
 
         final NamedThreadFactory threadFactory = new NamedThreadFactory(
-                ThreadNameHelper.receiver(muleContext, connector.getName()) + ".worker",
+                String.format("%s[%s].worker", ThreadNameHelper.receiver(muleContext, connector.getName()), getReceiverKey()),
                 muleContext.getExecutionClassLoader()
         );
         final ThreadingProfile tp = connector.getReceiverThreadingProfile();
@@ -134,46 +136,27 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
     @Override
     public void doDisconnect() throws ConnectException
     {
-        /* IMPLEMENTATION NOTE: Disconnects and tidies up any rources allocted
-           using the doConnect() method. This method should return the
-           MessageReceiver into a disconnected state so that it can be
-           connected again using the doConnect() method. */
-
-        // TODO release any resources here
+        disposing.set(true);
+        allChannels.close().awaitUninterruptibly();
     }
 
     @Override
     public void doStart()
     {
-        // Optional; does not need to be implemented. Delete if not required
-
-        /* IMPLEMENTATION NOTE: Should perform any actions necessary to enable
-           the reciever to start reciving events. This is different to the
-           doConnect() method which actually makes a connection to the
-           transport, but leaves the MessageReceiver in a stopped state. For
-           polling-based MessageReceivers the start() method simply starts the
-           polling thread. What action is performed here depends on
-           the transport being used. Most of the time a custom provider
-           doesn't need to override this method. */
     }
 
     @Override
     public void doStop()
     {
-        // Optional; does not need to be implemented. Delete if not required
-
-        /* IMPLEMENTATION NOTE: Should perform any actions necessary to stop
-           the reciever from receiving events. */
     }
 
     @Override
     public void doDispose()
     {
-        // Optional; does not need to be implemented. Delete if not required
-
-        /* IMPLEMENTATION NOTE: Is called when the Conector is being dispoed
-           and should clean up any resources. The doStop() and doDisconnect()
-           methods will be called implicitly when this method is called. */
+        if (bootstrap != null)
+        {
+            bootstrap.releaseExternalResources();
+        }
     }
     
 }

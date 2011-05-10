@@ -65,8 +65,8 @@ public class MuleServerUpstreamHandler extends SimpleChannelUpstreamHandler
         final ChannelBuffer buffer = (ChannelBuffer) event.getMessage();
         transferredBytes.addAndGet(buffer.readableBytes());
 
-        final ChannelBuffer copy = ChannelBuffers.copiedBuffer(buffer);
-        final String s = copy.toString(Charset.forName(receiver.getEndpoint().getEncoding()));
+        //final ChannelBuffer copy = ChannelBuffers.copiedBuffer(buffer);
+        //final String s = copy.toString(Charset.forName(receiver.getEndpoint().getEncoding()));
 
         final Channel channel = event.getChannel();
         try
