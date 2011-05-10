@@ -1,0 +1,1 @@
+http\://www.mulesoft.org/schema/mule/netty=org.mule.transport.netty.config.NettyNamespaceHandler
