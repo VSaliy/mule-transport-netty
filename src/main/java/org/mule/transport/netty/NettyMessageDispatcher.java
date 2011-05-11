@@ -12,8 +12,10 @@ package org.mule.transport.netty;
 
 import org.mule.api.MuleEvent;
 import org.mule.api.MuleMessage;
+import org.mule.api.endpoint.EndpointURI;
 import org.mule.api.endpoint.OutboundEndpoint;
 import org.mule.api.lifecycle.InitialisationException;
+import org.mule.api.transport.DispatchException;
 import org.mule.config.i18n.CoreMessages;
 import org.mule.transport.AbstractMessageDispatcher;
 import org.mule.transport.ConnectException;
@@ -30,11 +32,11 @@ import edu.emory.mathcs.backport.java.util.concurrent.TimeUnit;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
@@ -49,7 +51,6 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
 {
     protected ChannelGroup allChannels;
 
-    protected Channel channel;
     protected ClientBootstrap bootstrap;
 
     /**
@@ -97,19 +98,11 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
 
             final ChannelFuture future = bootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
             final Latch connectLatch = new Latch();
-            future.addListener(new ChannelFutureListener()
-            {
-                public void operationComplete(ChannelFuture future) throws Exception
-                {
-                    channel = future.getChannel();
-                    connectLatch.release();
-                }
-            });
-
+            future.addListener(new WaitTillDoneFutureListener(connectLatch));
             connectLatch.await(endpoint.getResponseTimeout(), TimeUnit.MILLISECONDS);
 
             // TODO close all connections
-            allChannels.add(channel);
+            //allChannels.add(channel);
         }
         catch (Exception e)
         {
@@ -153,10 +146,18 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
     public MuleMessage doSend(MuleEvent event) throws Exception
     {
         MuleMessage response = null;
-        if (channel.isConnected())
+        final EndpointURI uri = endpoint.getEndpointURI();
+        ChannelFuture future = bootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
+        final Latch connectLatch = new Latch();
+        future.addListener(new WaitTillDoneFutureListener(connectLatch));
+        connectLatch.await(endpoint.getResponseTimeout(), TimeUnit.MILLISECONDS);
+
+        final Channel channel = future.getChannel();
+        if (!channel.isConnected())
         {
-            channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
+            throw new DispatchException(CoreMessages.createStaticMessage("Not connected"), event, this);
         }
+        channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
         // TODO throw an error if not connected
         if (event.getEndpoint().getExchangePattern().hasResponse())
         {
@@ -185,9 +186,14 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         {
             super.messageReceived(ctx, e);
             final Object msg = e.getMessage();
-            // TODO timeout
-            exchanger.exchange(msg);
-            System.out.println("Got response!");
+            // short timeout, if there was noone waiting for response, it was an error
+            exchanger.exchange(msg, 10, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
+        {
+            super.exceptionCaught(ctx, e);
         }
     }
 }

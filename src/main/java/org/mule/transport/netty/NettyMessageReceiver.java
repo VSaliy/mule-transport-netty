@@ -155,7 +155,7 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
     {
         if (bootstrap != null)
         {
-            bootstrap.releaseExternalResources();
+            //bootstrap.releaseExternalResources();
         }
     }
     
