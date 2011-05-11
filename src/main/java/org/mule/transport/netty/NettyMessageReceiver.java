@@ -29,7 +29,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -50,12 +49,14 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
     protected final AtomicBoolean disposing = new AtomicBoolean(false);
     protected ServerBootstrap bootstrap;
     protected ChannelGroup allChannels;
+    protected NettyConnector nettyConnector;
 
     public NettyMessageReceiver(Connector connector, FlowConstruct flowConstruct,
                                 InboundEndpoint endpoint)
             throws CreateException
     {
         super(connector, flowConstruct, endpoint);
+        this.nettyConnector = (NettyConnector) connector;
     }
 
     @Override
@@ -67,10 +68,6 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
         final MuleContext muleContext = connector.getMuleContext();
 
         // TODO non-clashing receiver names, threading works differently for netty (back to Mule 1.x days!)
-        final ExecutorService bossExecutor = Executors.newCachedThreadPool(new NamedThreadFactory(
-                String.format("%s[%s].boss", ThreadNameHelper.receiver(muleContext, connector.getName()), getReceiverKey()),
-                muleContext.getExecutionClassLoader()
-        ));
 
         final NamedThreadFactory threadFactory = new NamedThreadFactory(
                 String.format("%s[%s].worker", ThreadNameHelper.receiver(muleContext, connector.getName()), getReceiverKey()),
@@ -78,6 +75,7 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
         );
         final ThreadingProfile tp = connector.getReceiverThreadingProfile();
 
+        // TODO configurable pool size
         final ExecutorService workerExecutor = new ThreadPoolExecutor(32, 32, tp.getThreadTTL(), java.util.concurrent.TimeUnit.MILLISECONDS,
                                                                       new ArrayBlockingQueue<Runnable>(1000),
                                                                       threadFactory,
@@ -87,7 +85,7 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
 
         this.bootstrap = new ServerBootstrap(
                 new NioServerSocketChannelFactory(
-                        bossExecutor,
+                        nettyConnector.bossExecutor,
                         // TODO why not extract this value from the workExecutor pool?
                         workerExecutor));
         this.bootstrap.setPipelineFactory(new ChannelPipelineFactory()

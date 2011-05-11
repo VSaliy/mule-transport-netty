@@ -12,27 +12,57 @@ package org.mule.transport.netty;
 
 import org.mule.api.MuleContext;
 import org.mule.api.MuleException;
+import org.mule.api.config.ThreadingProfile;
 import org.mule.api.lifecycle.InitialisationException;
 import org.mule.transport.AbstractConnector;
+import org.mule.util.concurrent.NamedThreadFactory;
+import org.mule.util.concurrent.ThreadNameHelper;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 
 /**
  * <code>NettyConnector</code> TODO document
  */
 public class NettyConnector extends AbstractConnector
 {
+
+    protected ExecutorService bossExecutor;
+    protected ExecutorService dispatcherExecutor;
+    protected NioClientSocketChannelFactory clientSocketChannelFactory;
+
     public NettyConnector(MuleContext context)
     {
         super(context);
     }
-       
+
     @Override
     public void doInitialise() throws InitialisationException
     {
-        // Optional; does not need to be implemented. Delete if not required
+        bossExecutor = Executors.newCachedThreadPool(new NamedThreadFactory(
+                String.format("%s%s.boss", ThreadNameHelper.getPrefix(muleContext), getName()),
+                muleContext.getExecutionClassLoader()
+        ));
 
-        /* IMPLEMENTATION NOTE: Is called once all bean properties have been
-           set on the connector and can be used to validate and initialise the
-           connectors state. */
+        final NamedThreadFactory threadFactory = new NamedThreadFactory(
+                String.format("%s.worker", ThreadNameHelper.dispatcher(muleContext, getName())),
+                muleContext.getExecutionClassLoader()
+        );
+        final ThreadingProfile tp = getDispatcherThreadingProfile();
+
+        // TODO configurable pool size
+        dispatcherExecutor = new ThreadPoolExecutor(32, 32, tp.getThreadTTL(),
+                                                    java.util.concurrent.TimeUnit.MILLISECONDS,
+                                                    new ArrayBlockingQueue<Runnable>(1000),
+                                                    threadFactory,
+                                                    new ThreadPoolExecutor.AbortPolicy()
+        );
+
+        clientSocketChannelFactory = new NioClientSocketChannelFactory(bossExecutor, dispatcherExecutor);
     }
 
     @Override

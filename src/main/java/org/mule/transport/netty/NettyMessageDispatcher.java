@@ -26,22 +26,16 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.concurrent.Exchanger;
-import java.util.concurrent.Executors;
 
 import edu.emory.mathcs.backport.java.util.concurrent.TimeUnit;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.string.StringEncoder;
 
 /**
@@ -51,12 +45,11 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
 {
     protected ChannelGroup allChannels;
 
-    protected ClientBootstrap bootstrap;
-
     /**
      * An exchanger used in async socket dispatches to provide request-reply behavior.
      */
     protected Exchanger<Object> exchanger = new Exchanger<Object>();
+    protected ClientBootstrap clientBootstrap;
 
     /* For general guidelines on writing transports see
        http://www.mulesoft.org/documentation/display/MULE3USER/Creating+Transports */
@@ -81,28 +74,20 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         {
             uri = endpoint.getEndpointURI().getUri();
 
-            bootstrap = new ClientBootstrap(
-                    new NioClientSocketChannelFactory(
-                            Executors.newCachedThreadPool(),
-                            Executors.newCachedThreadPool()));
+            clientBootstrap = new ClientBootstrap(((NettyConnector) connector).clientSocketChannelFactory);
 
-            // Set up the pipeline factory.
-            bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
-                public ChannelPipeline getPipeline() throws Exception {
-                    return Channels.pipeline(
-                            new StringEncoder(Charset.forName(endpoint.getEncoding())),
-                            new NettyDispatcherUpstreamHandler()
-                    );
+            clientBootstrap.setPipelineFactory(new ChannelPipelineFactory()
+            {
+                public ChannelPipeline getPipeline() throws Exception
+                {
+                    final ChannelPipeline pipeline = Channels.pipeline();
+                    pipeline.addLast("encoder-string",
+                                     new StringEncoder(Charset.forName(endpoint.getEncoding())));
+                    pipeline.addLast("handler-mule", new NettyDispatcherUpstreamHandler(NettyMessageDispatcher.this));
+
+                    return pipeline;
                 }
             });
-
-            final ChannelFuture future = bootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
-            final Latch connectLatch = new Latch();
-            future.addListener(new WaitTillDoneFutureListener(connectLatch));
-            connectLatch.await(endpoint.getResponseTimeout(), TimeUnit.MILLISECONDS);
-
-            // TODO close all connections
-            //allChannels.add(channel);
         }
         catch (Exception e)
         {
@@ -146,19 +131,23 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
     public MuleMessage doSend(MuleEvent event) throws Exception
     {
         MuleMessage response = null;
+
         final EndpointURI uri = endpoint.getEndpointURI();
-        ChannelFuture future = bootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
+        ChannelFuture future = clientBootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
+
+        final Channel channel = future.getChannel();
+
         final Latch connectLatch = new Latch();
         future.addListener(new WaitTillDoneFutureListener(connectLatch));
         connectLatch.await(endpoint.getResponseTimeout(), TimeUnit.MILLISECONDS);
 
-        final Channel channel = future.getChannel();
+        allChannels.add(channel);
+
         if (!channel.isConnected())
         {
             throw new DispatchException(CoreMessages.createStaticMessage("Not connected"), event, this);
         }
         channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
-        // TODO throw an error if not connected
         if (event.getEndpoint().getExchangePattern().hasResponse())
         {
             Object result = exchanger.exchange(event, event.getTimeout(), java.util.concurrent.TimeUnit.MILLISECONDS);
@@ -172,29 +161,11 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
     @Override
     public void doDispose()
     {
-        if (bootstrap != null)
-        {
+        //if (bootstrap != null)
+        //{
             //bootstrap.releaseExternalResources();
-        }
+        //}
     }
 
-    protected class NettyDispatcherUpstreamHandler extends SimpleChannelUpstreamHandler
-    {
-
-        @Override
-        public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
-        {
-            super.messageReceived(ctx, e);
-            final Object msg = e.getMessage();
-            // short timeout, if there was noone waiting for response, it was an error
-            exchanger.exchange(msg, 10, java.util.concurrent.TimeUnit.MILLISECONDS);
-        }
-
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
-        {
-            super.exceptionCaught(ctx, e);
-        }
-    }
 }
 
