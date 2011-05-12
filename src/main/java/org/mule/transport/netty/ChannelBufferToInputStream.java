@@ -22,10 +22,10 @@ import org.jboss.netty.buffer.ChannelBufferInputStream;
 /**
  *
  */
-public class NettyInboundTransformer extends AbstractDiscoverableTransformer
+public class ChannelBufferToInputStream extends AbstractDiscoverableTransformer
 {
 
-    public NettyInboundTransformer()
+    public ChannelBufferToInputStream()
     {
         // if adding more types here, update doTransform() logic
         registerSourceType(DataTypeFactory.create(ChannelBuffer.class));
