@@ -41,9 +41,6 @@ import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.handler.codec.string.StringEncoder;
 
-/**
- * <code>NettyMessageDispatcher</code> TODO document
- */
 public class NettyMessageDispatcher extends AbstractMessageDispatcher
 {
     protected ChannelGroup allChannels;
@@ -112,29 +109,6 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
     @Override
     public void doDispatch(MuleEvent event) throws Exception
     {
-        /* IMPLEMENTATION NOTE: This is invoked when the endpoint is
-           asynchronous.  It should invoke the transport but not return any
-           result.  If a result is returned it should be ignorred, but if the
-           underlying transport does have a notion of asynchronous processing,
-           that should be invoked.  This method is executed in a different
-           thread to the request thread. */
-
-
-        /* IMPLEMENTATION NOTE: The event message needs to be transformed for the outbound transformers to take effect. This
-           isn't done automatically in case the dispatcher needs to modify the message before apllying transformers.  To
-           get the transformed outbound message call -
-           event.transformMessage(); */
-
-        // TODO Write the client code here to dispatch the event over this transport
-
-        throw new UnsupportedOperationException("doDispatch");
-    }
-
-    @Override
-    public MuleMessage doSend(MuleEvent event) throws Exception
-    {
-        MuleMessage response = null;
-
         final EndpointURI uri = endpoint.getEndpointURI();
         ChannelFuture future = clientBootstrap.connect(new InetSocketAddress(uri.getHost(), uri.getPort()));
 
@@ -151,6 +125,14 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
             throw new DispatchException(CoreMessages.createStaticMessage("Not connected"), event, this);
         }
         channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
+    }
+
+    @Override
+    public MuleMessage doSend(MuleEvent event) throws Exception
+    {
+        MuleMessage response = null;
+
+        doDispatch(event);
         if (event.getEndpoint().getExchangePattern().hasResponse())
         {
             Object result = exchanger.exchange(event, event.getTimeout(), java.util.concurrent.TimeUnit.MILLISECONDS);
