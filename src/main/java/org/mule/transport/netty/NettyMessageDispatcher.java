@@ -31,9 +31,12 @@ import edu.emory.mathcs.backport.java.util.concurrent.TimeUnit;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.handler.codec.string.StringEncoder;
@@ -83,7 +86,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
                     final ChannelPipeline pipeline = Channels.pipeline();
                     pipeline.addLast("encoder-string",
                                      new StringEncoder(Charset.forName(endpoint.getEncoding())));
-                    pipeline.addLast("handler-mule", new NettyDispatcherUpstreamHandler(NettyMessageDispatcher.this));
+                    pipeline.addLast("handler-mule", new NettyDispatcherUpstreamHandler());
 
                     return pipeline;
                 }
@@ -167,5 +170,17 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         //}
     }
 
+    public class NettyDispatcherUpstreamHandler extends SimpleChannelUpstreamHandler
+    {
+        @Override
+        public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
+        {
+            super.messageReceived(ctx, e);
+            final Object msg = e.getMessage();
+            // short timeout, if there was noone waiting for response, it was an error
+            exchanger.exchange(msg, 1000, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+
+    }
 }
 
