@@ -8,7 +8,7 @@
  * LICENSE.txt file.
  */
 
-package org.mule.transport.netty;
+package org.mule.transport.netty.transformers;
 
 import org.mule.api.transformer.TransformerException;
 import org.mule.transformer.AbstractDiscoverableTransformer;
@@ -16,25 +16,25 @@ import org.mule.transformer.types.DataTypeFactory;
 
 import java.io.InputStream;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBufferInputStream;
+import org.jboss.netty.handler.stream.ChunkedStream;
 
 /**
+ * A transformer to be paired with the {@link org.jboss.netty.handler.stream.ChunkedWriteHandler}
  *
+ * @see org.jboss.netty.handler.stream.ChunkedWriteHandler
  */
-public class ChannelBufferToInputStream extends AbstractDiscoverableTransformer
+public class InputStreamToChunkedStreamTransformer extends AbstractDiscoverableTransformer
 {
 
-    public ChannelBufferToInputStream()
+    public InputStreamToChunkedStreamTransformer()
     {
         // if adding more types here, update doTransform() logic
-        registerSourceType(DataTypeFactory.create(ChannelBuffer.class));
+        registerSourceType(DataTypeFactory.create(InputStream.class));
     }
 
     @Override
-    protected InputStream doTransform(Object src, String enc) throws TransformerException
+    protected ChunkedStream doTransform(Object src, String enc) throws TransformerException
     {
-        ChannelBuffer buffer = (ChannelBuffer) src;
-        return new ChannelBufferInputStream(buffer);
+        return new ChunkedStream((InputStream) src);
     }
 }
