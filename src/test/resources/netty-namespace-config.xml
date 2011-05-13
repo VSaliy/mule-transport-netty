@@ -12,21 +12,12 @@
         <tcp:direct-protocol payloadOnly="true"/>
     </tcp:connector>
 
-    <custom-transformer name="bufferToString" class="org.mule.transport.netty.transformers.ChannelBufferToStringTransformer"/>
-
-    <netty:connector name="nettyConnector">
-        <!-- TODO Add connector specific properties here and then assert that 
-             they have been set in org.mule.transport.netty.NettyNamespaceHandlerTestCase -->
-    </netty:connector>
+    <netty:connector name="nettyConnector"/>
 
     <flow name="netty">
         <netty:inbound-endpoint address="netty://localhost:5000" exchange-pattern="request-response"/>
         <echo-component/>
-        <netty:outbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response">
-            <response>
-                <transformer ref="bufferToString"/>
-            </response>
-        </netty:outbound-endpoint>
+        <netty:outbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response"/>
     </flow>
 
     <flow name="netty2">
