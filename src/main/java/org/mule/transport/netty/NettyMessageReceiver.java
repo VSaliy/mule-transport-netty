@@ -204,9 +204,16 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
                         final Object payload = message.getPayload();
                         if (payload instanceof InputStream)
                         {
+                            // wrap incoming streams
                             final ChunkedStream stream = new ChunkedStream(message.getPayload(InputStream.class));
                             channel.getPipeline().addLast("streamer", new ChunkedWriteHandler());
                             channel.write(stream).addListener(ChannelFutureListener.CLOSE);
+                        }
+                        else if (payload instanceof ChunkedStream)
+                        {
+                            // chunked stream doesn't implement InputStream
+                            channel.getPipeline().addLast("streamer", new ChunkedWriteHandler());
+                            channel.write(payload).addListener(ChannelFutureListener.CLOSE);
                         }
                         else if (payload instanceof ChannelBuffer)
                         {
