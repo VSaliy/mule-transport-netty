@@ -6,7 +6,7 @@ Prerequisites
 
 Sample Config
 -------------------------------
-'''xml
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -38,4 +38,4 @@ Sample Config
     </flow>
 
 </mule>
-'''
+```
