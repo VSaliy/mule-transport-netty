@@ -25,7 +25,6 @@ import org.mule.util.concurrent.Latch;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.util.concurrent.Exchanger;
 
 import edu.emory.mathcs.backport.java.util.concurrent.TimeUnit;
@@ -41,7 +40,6 @@ import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
-import org.jboss.netty.handler.codec.string.StringEncoder;
 
 public class NettyMessageDispatcher extends AbstractMessageDispatcher
 {
@@ -83,8 +81,6 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
                 public ChannelPipeline getPipeline() throws Exception
                 {
                     final ChannelPipeline pipeline = Channels.pipeline();
-                    pipeline.addLast("encoder-string",
-                                     new StringEncoder(Charset.forName(endpoint.getEncoding())));
                     pipeline.addLast("handler-mule", new NettyDispatcherResponseHandler());
 
                     return pipeline;
@@ -126,7 +122,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         {
             throw new DispatchException(CoreMessages.createStaticMessage("Connect attempt timed out"), event, this);
         }
-        channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
+        channel.write(event.getMessage().getPayload());
     }
 
     @Override
