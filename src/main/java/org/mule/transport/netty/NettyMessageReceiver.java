@@ -10,7 +10,10 @@
 
 package org.mule.transport.netty;
 
+import org.mule.api.ExceptionPayload;
 import org.mule.api.MuleContext;
+import org.mule.api.MuleEvent;
+import org.mule.api.MuleMessage;
 import org.mule.api.config.ThreadingProfile;
 import org.mule.api.construct.FlowConstruct;
 import org.mule.api.endpoint.InboundEndpoint;
@@ -25,21 +28,33 @@ import org.mule.util.StringUtils;
 import org.mule.util.concurrent.NamedThreadFactory;
 import org.mule.util.concurrent.ThreadNameHelper;
 
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jboss.netty.bootstrap.ServerBootstrap;
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFutureListener;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.ExceptionEvent;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
+import org.jboss.netty.handler.codec.string.StringEncoder;
+import org.jboss.netty.handler.stream.ChunkedStream;
+import org.jboss.netty.handler.stream.ChunkedWriteHandler;
 
 /**
  * <code>NettyMessageReceiver</code> TODO document
@@ -98,7 +113,7 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
                 //p.addLast("encoder-length", new LengthFieldPrepender(2));
                 //p.addLast("chunker", new FixedLengthFrameDecoder(16384));
                 //p.addLast("executor", new ExecutionHandler(new OrderedMemoryAwareThreadPoolExecutor(16, 1048576, 1048576)));
-                p.addLast("handler-mule", new MuleUpstreamHandler(NettyMessageReceiver.this));
+                p.addLast("handler-mule", new MuleReceiverUpstreamHandler());
 
                 return p;
             }
@@ -156,5 +171,82 @@ public class NettyMessageReceiver extends  AbstractMessageReceiver
             //bootstrap.releaseExternalResources();
         }
     }
-    
+
+    /**
+     * Server-side Mule-Netty integration point.
+     */
+    public class MuleReceiverUpstreamHandler extends SimpleChannelUpstreamHandler
+    {
+
+        @Override
+        public void messageReceived(
+                ChannelHandlerContext ctx, MessageEvent event)
+        {
+            final ChannelBuffer buffer = (ChannelBuffer) event.getMessage();
+
+            final Channel channel = event.getChannel();
+            try
+            {
+
+                final NettyMessageReceiver receiver = NettyMessageReceiver.this;
+                // TODO create a NettyMuleMessageFactory
+                final MuleMessage muleMessage = receiver.createMuleMessage(buffer, receiver.getEndpoint().getEncoding());
+
+                if (receiver.getEndpoint().getExchangePattern().hasResponse())
+                {
+                    final MuleEvent result = receiver.routeMessage(muleMessage);
+
+                    final MuleMessage message = result.getMessage();
+                    final ExceptionPayload exceptionPayload = message.getExceptionPayload();
+                    if (exceptionPayload == null)
+                    {
+                        // happy path with no errors
+                        if (message.getPayload() instanceof InputStream)
+                        {
+                            final ChunkedStream stream = new ChunkedStream(message.getPayload(InputStream.class));
+                            channel.getPipeline().addLast("streamer", new ChunkedWriteHandler());
+                            channel.write(stream).addListener(ChannelFutureListener.CLOSE);
+                        }
+                        else
+                        {
+                            final ChannelBuffer out = ChannelBuffers.wrappedBuffer(message.getPayloadAsBytes());
+                            channel.write(out).addListener(ChannelFutureListener.CLOSE);
+                        }
+                    }
+                    else
+                    {
+                        // got an exception payload in the response
+                        // send an error message from the root exception
+                        channel.getPipeline().addLast("encoder", new StringEncoder(Charset.forName(receiver.getEndpoint().getEncoding())));
+                        final String rootCause = ExceptionUtils.getRootCauseMessage(exceptionPayload.getException());
+
+                        // TODO check bytes encoding
+                        channel.write(rootCause).addListener(ChannelFutureListener.CLOSE);
+                    }
+                }
+                else
+                {
+                    // async invocation, close the channel and proceed
+                    channel.close();
+                    receiver.routeMessage(muleMessage);
+                }
+            }
+            catch (Exception e)
+            {
+                // TODO error handling
+                e.printStackTrace();
+                channel.close();
+            }
+
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
+        {
+            //receiver.getFlowConstruct().getExceptionListener().handleException(e)
+            // TODO better error handling
+            e.getCause().printStackTrace();
+            e.getChannel().close();
+        }
+    }
 }
