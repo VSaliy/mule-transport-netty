@@ -23,6 +23,7 @@ import org.mule.util.ExceptionUtils;
 import org.mule.util.concurrent.Latch;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.concurrent.Exchanger;
@@ -35,6 +36,7 @@ import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
@@ -83,7 +85,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
                     final ChannelPipeline pipeline = Channels.pipeline();
                     pipeline.addLast("encoder-string",
                                      new StringEncoder(Charset.forName(endpoint.getEncoding())));
-                    pipeline.addLast("handler-mule", new NettyDispatcherUpstreamHandler());
+                    pipeline.addLast("handler-mule", new NettyDispatcherResponseHandler());
 
                     return pipeline;
                 }
@@ -122,7 +124,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
 
         if (!channel.isConnected())
         {
-            throw new DispatchException(CoreMessages.createStaticMessage("Not connected"), event, this);
+            throw new DispatchException(CoreMessages.createStaticMessage("Connect attempt timed out"), event, this);
         }
         channel.write(event.getMessage().getPayloadAsString(endpoint.getEncoding()));
     }
@@ -152,7 +154,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         //}
     }
 
-    public class NettyDispatcherUpstreamHandler extends SimpleChannelUpstreamHandler
+    public class NettyDispatcherResponseHandler extends SimpleChannelUpstreamHandler
     {
         @Override
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
@@ -163,6 +165,18 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
             exchanger.exchange(msg, 1000, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
 
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
+        {
+            if (logger.isErrorEnabled())
+            {
+                final SocketAddress remoteAddress = e.getChannel().getRemoteAddress();
+                final Throwable cause = e.getCause();
+                final Throwable rootCause = ExceptionUtils.getRootCause(cause);
+                logger.error("Error while handling response from " + remoteAddress, rootCause == null ? cause : rootCause);
+            }
+            e.getChannel().close();
+        }
     }
 }
 
