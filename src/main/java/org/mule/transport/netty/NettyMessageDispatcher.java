@@ -164,6 +164,7 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
+            // TODO propagate exception back to the caller
             if (logger.isErrorEnabled())
             {
                 final SocketAddress remoteAddress = e.getChannel().getRemoteAddress();
