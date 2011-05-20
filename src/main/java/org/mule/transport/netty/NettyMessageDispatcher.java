@@ -26,8 +26,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.concurrent.Exchanger;
+import java.util.concurrent.TimeUnit;
 
-import edu.emory.mathcs.backport.java.util.concurrent.TimeUnit;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
