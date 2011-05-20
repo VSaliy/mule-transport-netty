@@ -12,31 +12,27 @@ package org.mule.transport.netty.transformers;
 
 import org.mule.api.transformer.TransformerException;
 import org.mule.transformer.AbstractDiscoverableTransformer;
+import org.mule.transformer.types.DataTypeFactory;
 
 import java.io.UnsupportedEncodingException;
 
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 
-public class ObjectToChannelBufferTransformer extends AbstractDiscoverableTransformer
+public class ChannelBufferToString extends AbstractDiscoverableTransformer
 {
 
+    public ChannelBufferToString()
+    {
+        registerSourceType(DataTypeFactory.create(ChannelBuffer.class));
+    }
+
     @Override
-    protected ChannelBuffer doTransform(Object src, String enc) throws TransformerException
+    protected String doTransform(Object src, String enc) throws TransformerException
     {
         try
         {
-            if (src instanceof String)
-            {
-                final byte[] data = ((String) src).getBytes(enc);
-                return ChannelBuffers.wrappedBuffer(data);
-            }
-            else if (src instanceof byte[])
-            {
-                return ChannelBuffers.wrappedBuffer((byte[]) src);
-            }
-
-            throw new UnsupportedOperationException(src.getClass().getName());
+            final ChannelBuffer buffer = (ChannelBuffer) src;
+            return new String(buffer.array(), enc);
         }
         catch (UnsupportedEncodingException e)
         {
