@@ -101,7 +101,11 @@ public class NettyMessageDispatcher extends AbstractMessageDispatcher
     @Override
     public void doDisconnect() throws Exception
     {
-        allChannels.close().awaitUninterruptibly();
+        // in case it never had a chance to initialize
+        if (allChannels != null)
+        {
+            allChannels.close().awaitUninterruptibly();
+        }
     }
 
     @Override
