@@ -4,6 +4,14 @@ Prerequisites
 * Netty development builds (e.g. 4.0.0.Alpha1-SNAPSHOT). Best built directly from source by forking it here on GitHub: http://github.com/netty/netty
 * Java 6 - a dependency of Netty 4.x library and Mule 3.2.x in the future
 
+Current Limitations
+===============================
+* At the moment only TCP stack is supported. In the future the plan is to support any codec, meaning tcp, http, websocket, etc.
+* Threading profiles can't yet be configured (planned)
+* Netty codec stack can't be configured yet (planned)
+* No out-of-the-box support for Mule's length protocol (but still possible via standard Netty's codecs). As a result longer (e.g. 4KB)
+  messages will get fragmented by tcp layer. This will be addressed once the above configuration options are implemented.
+
 Sample Config
 -------------------------------
 ```xml

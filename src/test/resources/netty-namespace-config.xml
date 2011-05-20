@@ -23,7 +23,7 @@
              to a 'generic' type like a stream. We're staying within Netty and can operate directly on ChannelBuffer.
         -->
         <netty:inbound-endpoint address="netty://localhost:5000" disableTransportTransformer="true"/>
-        <netty:outbound-endpoint address="netty://localhost:5001"/>
+        <netty:outbound-endpoint address="netty://localhost:5001" responseTimeout="5000"/>
     </flow>
 
     <flow name="netty-echo">
