@@ -13,7 +13,6 @@ package org.mule.transport.netty;
 import org.mule.api.MuleMessage;
 import org.mule.api.client.MuleClient;
 import org.mule.tck.FunctionalTestCase;
-import org.mule.transport.netty.NettyConnector;
 
 /**
  * TODO
@@ -29,9 +28,11 @@ public class NettyFunctionalTestCase extends FunctionalTestCase
     public void testNettyConfig() throws Exception
     {
         MuleClient client = muleContext.getClient();
-        final MuleMessage result = client.send("tcp://localhost:5000?connector=testClientConnector", "test", null, 1000000);
+        final MuleMessage result = client.send("tcp://localhost:5000?connector=testClientConnector", "test", null, 10000);
         assertNotNull(result);
         assertNull(result.getExceptionPayload());
         assertEquals("test Received", result.getPayloadAsString());
+
+        //Thread.sleep(1000000);
     }
 }
