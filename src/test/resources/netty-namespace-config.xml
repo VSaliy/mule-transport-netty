@@ -18,13 +18,13 @@
     <netty:connector name="nettyConnector"/>
 
     <flow name="netty-bridge">
-        <netty:inbound-endpoint address="netty://localhost:5000" exchange-pattern="request-response"/>
+        <netty:inbound-endpoint address="netty://localhost:5000"/>
         <echo-component/>
-        <netty:outbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response"/>
+        <netty:outbound-endpoint address="netty://localhost:5001"/>
     </flow>
 
     <flow name="netty-echo">
-        <netty:inbound-endpoint address="netty://localhost:5001" exchange-pattern="request-response"/>
+        <netty:inbound-endpoint address="netty://localhost:5001"/>
         <append-string-transformer message=" Received"/>
     </flow>
 
