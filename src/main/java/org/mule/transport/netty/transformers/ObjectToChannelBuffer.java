@@ -11,7 +11,9 @@
 package org.mule.transport.netty.transformers;
 
 import org.mule.api.transformer.TransformerException;
+import org.mule.config.i18n.CoreMessages;
 import org.mule.transformer.AbstractDiscoverableTransformer;
+import org.mule.transformer.types.DataTypeFactory;
 
 import java.io.UnsupportedEncodingException;
 
@@ -20,6 +22,12 @@ import org.jboss.netty.buffer.ChannelBuffers;
 
 public class ObjectToChannelBuffer extends AbstractDiscoverableTransformer
 {
+
+    public ObjectToChannelBuffer()
+    {
+        registerSourceType(DataTypeFactory.create(String.class));
+        registerSourceType(DataTypeFactory.create(byte[].class));
+    }
 
     @Override
     protected ChannelBuffer doTransform(Object src, String enc) throws TransformerException
@@ -36,7 +44,9 @@ public class ObjectToChannelBuffer extends AbstractDiscoverableTransformer
                 return ChannelBuffers.wrappedBuffer((byte[]) src);
             }
 
-            throw new UnsupportedOperationException(src.getClass().getName());
+            throw new TransformerException(CoreMessages.transformOnObjectUnsupportedTypeOfEndpoint(
+                    this.getName(), src.getClass(), endpoint));
+
         }
         catch (UnsupportedEncodingException e)
         {
