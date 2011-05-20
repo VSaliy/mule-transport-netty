@@ -27,8 +27,11 @@ Sample Config
     <netty:connector name="nettyConnector"/>
 
     <flow name="netty-bridge">
-        <netty:inbound-endpoint address="netty://localhost:5000"/>
-        <echo-component/>
+        <!--
+             Optimize by disabling transport transformer and skipping unnecessary type conversion
+             to a 'generic' type like a stream. We're staying within Netty and can operate directly on ChannelBuffer.
+        -->
+        <netty:inbound-endpoint address="netty://localhost:5000" disableTransportTransformer="true"/>
         <netty:outbound-endpoint address="netty://localhost:5001"/>
     </flow>
 
